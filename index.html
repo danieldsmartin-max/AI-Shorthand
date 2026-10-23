@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Shorthand Note Expander & Knowledge Synthesizer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Font Awesome & Google Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* Glassmorphism Styles */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    .dark .glass-card {
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.6);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.6); }
+
+    /* SVG Graph Animation */
+    .node-pulse {
+      animation: pulse 2.5s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.04); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-full flex flex-col transition-colors duration-200">
+
+  <!-- TOP HEADER NAVBAR -->
+  <header class="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 lg:px-6 py-2.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-500/20">
+        <i class="fa-solid fa-brain-circuit text-xl"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-base sm:text-lg leading-tight text-slate-900 dark:text-white flex items-center gap-2">
+          NoteSynthesizer AI
+          <span class="text-[10px] uppercase font-bold tracking-wider bg-gradient-to-r from-blue-600 to-purple-600 text-white px-2 py-0.5 rounded-full">Gemini Flash AI</span>
+        </h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Zero-Config Shorthand Expansion, Topic Auto-Detection & Knowledge Synthesis</p>
+      </div>
+    </div>
+
+    <!-- Right Controls Header -->
+    <div class="flex items-center space-x-2">
+      <!-- AI Status Badge -->
+      <div id="aiStatusBadge" class="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-xl text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>Gemini Flash Ready</span>
+      </div>
+
+      <!-- Theme Switcher -->
+      <button onclick="toggleDarkMode()" class="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition" title="Toggle Dark/Light Mode">
+        <i class="fa-solid fa-moon dark:hidden"></i>
+        <i class="fa-solid fa-sun hidden dark:inline text-amber-400"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- TOAST NOTIFICATION SYSTEM -->
+  <div id="toast" class="fixed top-16 right-4 z-50 transform -translate-y-4 opacity-0 transition-all duration-300 pointer-events-none bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs sm:text-sm font-medium">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 dark:text-emerald-600"></i>
+    <span id="toastMsg">Action completed successfully</span>
+  </div>
+
+  <!-- MAIN APP WORKSPACE -->
+  <div class="flex-1 max-w-[1750px] w-full mx-auto p-3 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+    
+    <!-- LEFT SIDEBAR: INPUT & CONTROLS (5 Cols) -->
+    <aside class="lg:col-span-5 flex flex-col gap-4">
+      
+      <!-- Raw Shorthand Input Box -->
+      <div class="glass-card rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <label for="rawInput" class="font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
+            <i class="fa-solid fa-pen-field text-blue-500"></i> Raw Unstructured Shorthand
+          </label>
+          <div class="flex items-center gap-2">
+            <button onclick="clearInput()" class="text-xs text-slate-400 hover:text-rose-500 transition">Clear</button>
+          </div>
+        </div>
+
+        <!-- Preset Buttons Row -->
+        <div class="flex flex-wrap items-center gap-1.5 pb-1">
+          <span class="text-[11px] font-semibold text-slate-400">Presets:</span>
+          <button onclick="loadPreset('dev')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-medium transition">
+            <i class="fa-solid fa-code mr-1"></i>Dev Sprint
+          </button>
+          <button onclick="loadPreset('medical')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-medium transition">
+            <i class="fa-solid fa-stethoscope mr-1"></i>Medical Chart
+          </button>
+          <button onclick="loadPreset('legal')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-600 dark:text-amber-400 rounded-lg text-xs font-medium transition">
+            <i class="fa-solid fa-scale-balanced mr-1"></i>Legal Counsel
+          </button>
+          <button onclick="loadPreset('sales')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-slate-700 text-purple-600 dark:text-purple-400 rounded-lg text-xs font-medium transition">
+            <i class="fa-solid fa-chart-line mr-1"></i>Sales Meeting
+          </button>
+        </div>
+
+        <!-- Textarea Input -->
+        <div class="relative">
+          <textarea id="rawInput" rows="10" placeholder="Paste or dictate shorthand notes here... AI will automatically detect domain, abbreviations, shorthand jargon, and action items!" class="w-full p-3.5 bg-slate-50/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-sm font-mono leading-relaxed resize-y transition"></textarea>
+          
+          <!-- Live Voice Dictation Button -->
+          <button id="dictationBtn" onclick="toggleDictation()" class="absolute bottom-3 right-3 p-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition flex items-center gap-1.5 text-xs font-semibold" title="Toggle Dictation">
+            <i id="dictationIcon" class="fa-solid fa-microphone text-rose-500"></i>
+            <span id="dictationLabel">Dictate</span>
+          </button>
+        </div>
+
+        <!-- Word/Char Count Footer -->
+        <div class="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 px-1">
+          <div class="flex items-center gap-3">
+            <span id="statWords">0 words</span>
+            <span>•</span>
+            <span id="statChars">0 chars</span>
+          </div>
+          <span id="statReadTime"><i class="fa-regular fa-clock mr-1"></i>0 min read</span>
+        </div>
+
+        <!-- Output Format Configuration -->
+        <div class="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+          <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Synthesizer Output Template</label>
+          <select id="templateSelect" onchange="runSynthesizerPipeline()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 outline-none">
+            <option value="executive">Executive Brief (Summary, Bullets & Action Items)</option>
+            <option value="tech">Technical Specification & Notes</option>
+            <option value="checklist">Action Checklist & Task Matrix</option>
+            <option value="academic">Academic & Detailed Study Outline</option>
+          </select>
+        </div>
+
+        <!-- AI Expansion Trigger Button -->
+        <button id="synthesizeBtn" onclick="runSynthesizerPipeline()" class="w-full py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-500/25 transition flex items-center justify-center gap-2 active:scale-98">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Auto-Expand & Synthesize Notes</span>
+        </button>
+      </div>
+
+      <!-- AUTO-DETECTED SHORTHAND & ABBREVIATION BREAKDOWN CARD -->
+      <div class="glass-card rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-magnifying-glass-chart text-indigo-500"></i> AI Auto-Detected Shorthand Dictionary
+          </span>
+          <span id="shorthandCountBadge" class="text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full">0 Detected</span>
+        </div>
+
+        <!-- Detected Abbreviations Badges Container -->
+        <div id="detectedShorthandBadges" class="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto p-1">
+          <span class="text-xs text-slate-400 italic">Run AI synthesis to auto-detect shorthand terms...</span>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- RIGHT PANEL: SYNTHESIS OUTPUT, TOPIC ANALYSIS & MINDMAP (7 Cols) -->
+    <main class="lg:col-span-7 flex flex-col gap-4">
+      
+      <!-- TOP NAVIGATION TABS -->
+      <div class="flex items-center justify-between bg-white/60 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+        <div class="flex items-center space-x-1">
+          <button id="tabBtnFormatted" onclick="switchOutputTab('formatted')" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition">
+            <i class="fa-solid fa-file-lines mr-1.5"></i> Synthesized Notes
+          </button>
+          <button id="tabBtnMindmap" onclick="switchOutputTab('mindmap')" class="px-3.5 py-1.5 text-xs font-bold rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">
+            <i class="fa-solid fa-circle-nodes mr-1.5 text-purple-500"></i> Interactive Mindmap
+          </button>
+          <button id="tabBtnActions" onclick="switchOutputTab('actions')" class="px-3.5 py-1.5 text-xs font-bold rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">
+            <i class="fa-solid fa-list-check mr-1.5 text-emerald-500"></i> Action Matrix
+          </button>
+        </div>
+
+        <!-- Export Dropdown Suite -->
+        <div class="relative group">
+          <button class="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition flex items-center gap-1.5">
+            <i class="fa-solid fa-share-nodes"></i> Export <i class="fa-solid fa-chevron-down text-[10px]"></i>
+          </button>
+          <div class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl hidden group-hover:block p-1.5 z-30">
+            <button onclick="exportNote('markdown')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center gap-2">
+              <i class="fa-brands fa-markdown text-blue-500"></i> Markdown (.md)
+            </button>
+            <button onclick="exportNote('copy')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center gap-2">
+              <i class="fa-solid fa-copy text-purple-500"></i> Copy Formatted Text
+            </button>
+            <button onclick="exportNote('json')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center gap-2">
+              <i class="fa-solid fa-code text-amber-500"></i> JSON Raw Data
+            </button>
+            <button onclick="exportNote('print')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center gap-2">
+              <i class="fa-solid fa-print text-emerald-500"></i> Print / PDF
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUTO-DETECTED TOPIC & SUMMARY CARD -->
+      <div class="glass-card rounded-2xl p-4 shadow-sm flex flex-col gap-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-layer-group text-blue-500"></i> Auto-Detected Domain & Analysis
+          </span>
+          <div id="domainBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+            Domain: General
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-semibold text-slate-400">Detected Topics:</span>
+          <div id="topicTags" class="flex flex-wrap gap-1.5">
+            <span class="text-xs text-slate-400 italic">No topics analyzed yet</span>
+          </div>
+        </div>
+        <div id="aiSummaryBox" class="text-xs text-slate-600 dark:text-slate-300 italic bg-slate-50/80 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
+          Enter text and click "Auto-Expand & Synthesize Notes" to analyze domain and generate summary.
+        </div>
+      </div>
+
+      <!-- VIEW 1: EXPANDED NOTE DISPLAY -->
+      <div id="viewFormatted" class="glass-card rounded-2xl p-5 shadow-sm min-h-[460px] flex flex-col gap-4">
+        
+        <!-- Note Body Container -->
+        <div id="noteOutputBody" class="flex-1 text-sm leading-relaxed text-slate-800 dark:text-slate-100 space-y-3 overflow-y-auto max-h-[500px] pr-1">
+          <div class="text-slate-400 dark:text-slate-500 italic text-center py-20 flex flex-col items-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles text-4xl opacity-30 text-indigo-500"></i>
+            <span>Enter shorthand notes on the left and click synthesize to begin.</span>
+          </div>
+        </div>
+
+        <!-- Expansion Metrics Footer -->
+        <div class="pt-3 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
+          <span id="metricReplacements"><i class="fa-solid fa-bolt text-amber-500 mr-1"></i>0 shorthand terms detected</span>
+          <span id="metricExpansionRatio">Expansion Factor: 1.0x</span>
+        </div>
+      </div>
+
+      <!-- VIEW 2: INTERACTIVE MINDMAP VISUALIZATION -->
+      <div id="viewMindmap" class="hidden glass-card rounded-2xl p-5 shadow-sm min-h-[460px] flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+          <span class="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-nodes text-purple-500"></i> Auto-Generated Concept & Entity Mindmap
+          </span>
+          <span class="text-[11px] text-slate-400">Dynamic node graph from AI topic extraction</span>
+        </div>
+        <div id="svgMindmapContainer" class="flex-1 w-full bg-slate-900/90 rounded-xl border border-slate-800 flex items-center justify-center p-2 min-h-[380px] overflow-hidden">
+          <span class="text-xs text-slate-500 italic">Generate synthesized notes to render knowledge mindmap.</span>
+        </div>
+      </div>
+
+      <!-- VIEW 3: ACTION ITEMS & ASSIGNEE MATRIX -->
+      <div id="viewActions" class="hidden glass-card rounded-2xl p-5 shadow-sm min-h-[460px] flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+          <span class="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-list-check text-emerald-500"></i> Auto-Extracted Action Items & Assignees
+          </span>
+          <span id="actionCountBadge" class="text-xs bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">0 Tasks</span>
+        </div>
+
+        <!-- Task Table -->
+        <div class="flex-1 overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase tracking-wider">
+                <th class="py-2 px-3 font-semibold">Action / Task</th>
+                <th class="py-2 px-3 font-semibold">Assignee</th>
+                <th class="py-2 px-3 font-semibold">Priority</th>
+                <th class="py-2 px-3 font-semibold">Status</th>
+              </tr>
+            </thead>
+            <tbody id="actionMatrixBody" class="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-200">
+              <tr>
+                <td colspan="4" class="py-12 text-center text-slate-400 italic">No action items extracted.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- JAVASCRIPT LOGIC ENGINE -->
+  <script>
+    // PRESET SAMPLES
+    const PRESETS = {
+      dev: `mtg w/ backend dev team b/c ci/cd pipeline failed in prod env.
+pr approved by @sarah after code review.
+q: what is eta for db schema migration?
+act: @alex fix API authentication bug by 5pm today [High Priority]
+act: @dev-team review performance kpi metrics before release.`,
+      
+      medical: `pt presented w/ elevated bp and irregular pr.
+dx: hypertension secondary to acute stress.
+rx: prescribed beta-blockers 10mg bid.
+act: @nurse schedule follow-up pt appointment in 2 weeks [High Priority]
+q: does pt have history of allergic reactions?`,
+
+      legal: `counsel met re: nda revision w/ counterparty.
+ip rights clause amended per loa guidelines.
+act: @jessica file formal motion with probate register by eod Friday [High Priority]
+q: expected timeline for litigation settlement?`,
+
+      sales: `qtr review w/ executive leadership. mom revenue increased by 22% b/c pr campaign succeeded.
+kpi targets met for fiscal year.
+act: @david draft revised contract for enterprise client by tomorrow [Med Priority]
+q: projected roi for Q3 digital ad spend?`
+    };
+
+    // LOCAL FALLBACK SHORTHAND DICTIONARY
+    const FALLBACK_RULES = {
+      "pr": "Pull Request",
+      "ci": "Continuous Integration",
+      "cd": "Continuous Deployment",
+      "env": "environment",
+      "prod": "production",
+      "dev": "development",
+      "req": "requirement",
+      "api": "Application Programming Interface",
+      "db": "database",
+      "mtg": "meeting",
+      "w/": "with",
+      "w/o": "without",
+      "b/c": "because",
+      "act:": "Action Item:",
+      "q:": "Question:",
+      "eta": "estimated time of arrival",
+      "kpi": "Key Performance Indicator",
+      "bp": "Blood Pressure",
+      "dx": "Diagnosis",
+      "rx": "Prescription",
+      "pt": "Patient",
+      "nda": "Non-Disclosure Agreement",
+      "ip": "Intellectual Property",
+      "loa": "Letter of Agreement",
+      "mom": "Month over Month",
+      "roi": "Return on Investment",
+      "qtr": "Quarter",
+      "eod": "End of Day"
+    };
+
+    let isDictating = false;
+    let recognition = null;
+    let lastProcessedData = { expandedText: '', detectedShorthand: {}, domain: 'General', summary: '', topics: [], actions: [] };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadPreset('dev');
+      setupDictationEngine();
+    });
+
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+    }
+
+    function loadPreset(type) {
+      if (PRESETS[type]) {
+        document.getElementById('rawInput').value = PRESETS[type];
+        updateInputStats();
+        runSynthesizerPipeline();
+      }
+    }
+
+    function clearInput() {
+      document.getElementById('rawInput').value = '';
+      updateInputStats();
+      resetOutputs();
+    }
+
+    document.getElementById('rawInput').addEventListener('input', updateInputStats);
+    function updateInputStats() {
+      const text = document.getElementById('rawInput').value;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const chars = text.length;
+      const readTime = Math.max(1, Math.ceil(words / 200));
+
+      document.getElementById('statWords').innerText = `${words} words`;
+      document.getElementById('statChars').innerText = `${chars} chars`;
+      document.getElementById('statReadTime').innerText = `${words > 0 ? readTime : 0} min read`;
+    }
+
+    // MAIN AI SYNTHESIZER PIPELINE (GEMINI 3 FLASH API)
+    async function runSynthesizerPipeline() {
+      const rawText = document.getElementById('rawInput').value.trim();
+      const templateStyle = document.getElementById('templateSelect').value;
+
+      if (!rawText) {
+        resetOutputs();
+        return;
+      }
+
+      setLoadingState(true);
+
+      try {
+        // Attempt Gemini 3 Flash Call
+        const aiData = await callGeminiSynthesizerAPI(rawText, templateStyle);
+        
+        if (aiData && aiData.expandedText) {
+          lastProcessedData = aiData;
+          renderAllOutputs(aiData, rawText.length);
+        } else {
+          // Fallback to heuristic engine if needed
+          runFallbackSynthesizer(rawText);
+        }
+      } catch (err) {
+        console.warn("Gemini API call failed, using heuristic engine:", err);
+        runFallbackSynthesizer(rawText);
+      } finally {
+        setLoadingState(false);
+      }
+    }
+
+    // GEMINI API FETCH
+    async function callGeminiSynthesizerAPI(rawText, templateStyle) {
+      const apiKey = ""; // Canvas environment automatically handles authorized endpoint runtime
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const systemPrompt = `You are NoteSynthesizer AI, an expert note expander, shorthand detector, and topic analyst.
+Your task:
+1. Automatically detect ALL shorthand, acronyms, technical jargon, and abbreviations in the user's text and map them to their expanded contextual definitions.
+2. Auto-detect the primary Industry Domain (e.g., Software Engineering, Medical, Legal, Sales & Finance, Academic).
+3. Auto-detect the top 3-4 key topics/keywords.
+4. Auto-generate a concise 1-2 sentence executive summary.
+5. Expand the raw shorthand notes into clean, structured Markdown text according to the requested template: ${templateStyle.toUpperCase()}.
+6. Extract all action items, assignees (@name), and priorities.
+
+Return strictly valid JSON with this exact schema:
+{
+  "domain": "Domain Name",
+  "summary": "1-2 sentence core summary",
+  "topics": ["Topic1", "Topic2", "Topic3"],
+  "detectedShorthand": {
+    "shorthandTerm": "Expanded Meaning"
+  },
+  "expandedText": "Full formatted markdown notes text...",
+  "actions": [
+    { "task": "Task description", "assignee": "@Name or Unassigned", "priority": "High|Med|Low", "status": "Pending" }
+  ]
+}`;
+
+      const payload = {
+        contents: [{ parts: [{ text: `Expand and synthesize these raw notes:\n\n${rawText}` }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) return null;
+      const result = await response.json();
+      const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      return jsonText ? JSON.parse(jsonText) : null;
+    }
+
+    // HEURISTIC FALLBACK SYNTHESIZER
+    function runFallbackSynthesizer(rawText) {
+      let expandedText = rawText;
+      const detectedShorthand = {};
+
+      Object.keys(FALLBACK_RULES).forEach(key => {
+        const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = /[a-zA-Z0-9]$/.test(key) ? new RegExp(`\\b${escaped}\\b`, 'gi') : new RegExp(`${escaped}`, 'gi');
+        if (regex.test(expandedText)) {
+          detectedShorthand[key] = FALLBACK_RULES[key];
+          expandedText = expandedText.replace(regex, FALLBACK_RULES[key]);
+        }
+      });
+
+      const actions = [];
+      rawText.split('\n').forEach(line => {
+        if (line.toLowerCase().includes('act:') || line.toLowerCase().includes('action')) {
+          const assigneeMatch = line.match(/@(\w+)/);
+          actions.push({
+            task: line.replace(/^(act:|action:)\s*/i, '').trim(),
+            assignee: assigneeMatch ? `@${assigneeMatch[1]}` : 'Unassigned',
+            priority: line.toLowerCase().includes('high') ? 'High' : 'Med',
+            status: 'Pending'
+          });
+        }
+      });
+
+      lastProcessedData = {
+        domain: 'Auto-Detected (Local)',
+        summary: 'Notes processed using local intelligent shorthand engine.',
+        topics: ['SYNTHESIZED NOTES', 'ACTION ITEMS'],
+        detectedShorthand,
+        expandedText,
+        actions
+      };
+
+      renderAllOutputs(lastProcessedData, rawText.length);
+    }
+
+    // RENDER ALL UI OUTPUTS
+    function renderAllOutputs(data, rawLen) {
+      // 1. Domain & Summary Card
+      document.getElementById('domainBadge').innerText = `Domain: ${data.domain || 'General'}`;
+      document.getElementById('aiSummaryBox').innerText = data.summary || 'Summary generated successfully.';
+      
+      const topicContainer = document.getElementById('topicTags');
+      topicContainer.innerHTML = (data.topics || []).map(t => `
+        <span class="text-xs font-semibold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+          #${escapeHtml(t)}
+        </span>
+      `).join('');
+
+      // 2. Detected Shorthand Badges
+      const shorthandContainer = document.getElementById('detectedShorthandBadges');
+      const terms = Object.entries(data.detectedShorthand || {});
+      document.getElementById('shorthandCountBadge').innerText = `${terms.length} Detected`;
+
+      if (terms.length === 0) {
+        shorthandContainer.innerHTML = `<span class="text-xs text-slate-400 italic">No explicit shorthand terms detected.</span>`;
+      } else {
+        shorthandContainer.innerHTML = terms.map(([k, v]) => `
+          <span class="inline-flex items-center gap-1.5 text-xs font-mono bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800">
+            <strong class="text-blue-600 dark:text-blue-400">${escapeHtml(k)}</strong> &rarr; ${escapeHtml(v)}
+          </span>
+        `).join('');
+      }
+
+      // 3. Formatted Note Output
+      const noteBody = document.getElementById('noteOutputBody');
+      const paragraphs = (data.expandedText || '').split('\n').filter(Boolean);
+      noteBody.innerHTML = paragraphs.map(p => {
+        if (p.startsWith('#')) return `<h3 class="font-bold text-base text-blue-600 dark:text-blue-400 mt-2">${escapeHtml(p.replace(/^#+\s*/, ''))}</h3>`;
+        if (p.startsWith('-') || p.startsWith('*')) return `<li class="ml-4 list-disc">${escapeHtml(p.replace(/^[-*]\s*/, ''))}</li>`;
+        return `<p class="leading-relaxed">${escapeHtml(p)}</p>`;
+      }).join('');
+
+      document.getElementById('metricReplacements').innerHTML = `<i class="fa-solid fa-bolt text-amber-500 mr-1"></i>${terms.length} shorthand terms auto-expanded`;
+      const ratio = ((data.expandedText || '').length / Math.max(1, rawLen)).toFixed(2);
+      document.getElementById('metricExpansionRatio').innerText = `Expansion Factor: ${ratio}x`;
+
+      // 4. Action Matrix
+      renderActionMatrix(data.actions || []);
+
+      // 5. SVG Mindmap
+      renderSVGGraph(data.topics || ['Notes'], data.actions || [], data.detectedShorthand || {});
+    }
+
+    function renderActionMatrix(actions) {
+      const body = document.getElementById('actionMatrixBody');
+      document.getElementById('actionCountBadge').innerText = `${actions.length} Tasks`;
+
+      if (actions.length === 0) {
+        body.innerHTML = `<tr><td colspan="4" class="py-12 text-center text-slate-400 italic">No action items extracted.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = actions.map(a => `
+        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+          <td class="py-2.5 px-3 font-medium">${escapeHtml(a.task)}</td>
+          <td class="py-2.5 px-3 text-indigo-600 dark:text-indigo-400 font-semibold">${escapeHtml(a.assignee)}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${a.priority === 'High' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'}">
+              ${a.priority}
+            </span>
+          </td>
+          <td class="py-2.5 px-3 text-emerald-600 dark:text-emerald-400 font-medium">${a.status}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderSVGGraph(topics, actions, terms) {
+      const container = document.getElementById('svgMindmapContainer');
+      const rootTopic = topics[0] || 'SYNTHESIS';
+      const sub1 = topics[1] || 'Key Insights';
+      const sub2 = topics[2] || 'Domain Terms';
+
+      container.innerHTML = `
+        <svg width="100%" height="360" viewBox="0 0 600 360" class="w-full h-full">
+          <line x1="300" y1="180" x2="160" y2="90" stroke="#6366f1" stroke-width="2" stroke-dasharray="4" />
+          <line x1="300" y1="180" x2="440" y2="90" stroke="#6366f1" stroke-width="2" stroke-dasharray="4" />
+          <line x1="300" y1="180" x2="200" y2="280" stroke="#10b981" stroke-width="2" />
+          <line x1="300" y1="180" x2="400" y2="280" stroke="#f59e0b" stroke-width="2" />
+
+          <!-- Central Node -->
+          <g class="node-pulse cursor-pointer">
+            <circle cx="300" cy="180" r="44" fill="#3b82f6" opacity="0.95" />
+            <text x="300" y="184" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="bold">${escapeHtml(rootTopic)}</text>
+          </g>
+
+          <!-- Topic Nodes -->
+          <g>
+            <circle cx="160" cy="90" r="32" fill="#8b5cf6" />
+            <text x="160" y="94" text-anchor="middle" fill="#ffffff" font-size="10">${escapeHtml(sub1)}</text>
+          </g>
+          <g>
+            <circle cx="440" cy="90" r="32" fill="#8b5cf6" />
+            <text x="440" y="94" text-anchor="middle" fill="#ffffff" font-size="10">${escapeHtml(sub2)}</text>
+          </g>
+
+          <!-- Action & Terms Nodes -->
+          <g>
+            <circle cx="200" cy="280" r="28" fill="#10b981" />
+            <text x="200" y="284" text-anchor="middle" fill="#ffffff" font-size="9">Tasks (${actions.length})</text>
+          </g>
+          <g>
+            <circle cx="400" cy="280" r="28" fill="#f59e0b" />
+            <text x="400" y="284" text-anchor="middle" fill="#ffffff" font-size="9">Terms (${Object.keys(terms).length})</text>
+          </g>
+        </svg>
+      `;
+    }
+
+    // TAB SWITCHING
+    function switchOutputTab(tab) {
+      document.getElementById('viewFormatted').classList.add('hidden');
+      document.getElementById('viewMindmap').classList.add('hidden');
+      document.getElementById('viewActions').classList.add('hidden');
+
+      ['Formatted', 'Mindmap', 'Actions'].forEach(t => {
+        const btn = document.getElementById(`tabBtn${t}`);
+        btn.className = "px-3.5 py-1.5 text-xs font-bold rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition";
+      });
+
+      if (tab === 'formatted') {
+        document.getElementById('viewFormatted').classList.remove('hidden');
+        document.getElementById('tabBtnFormatted').className = "px-3.5 py-1.5 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm transition";
+      } else if (tab === 'mindmap') {
+        document.getElementById('viewMindmap').classList.remove('hidden');
+        document.getElementById('tabBtnMindmap').className = "px-3.5 py-1.5 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 shadow-sm transition";
+      } else if (tab === 'actions') {
+        document.getElementById('viewActions').classList.remove('hidden');
+        document.getElementById('tabBtnActions').className = "px-3.5 py-1.5 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm transition";
+      }
+    }
+
+    function setLoadingState(loading) {
+      const btn = document.getElementById('synthesizeBtn');
+      if (loading) {
+        btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> <span>AI Synthesizing Notes...</span>`;
+        btn.disabled = true;
+      } else {
+        btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> <span>Auto-Expand & Synthesize Notes</span>`;
+        btn.disabled = false;
+      }
+    }
+
+    function resetOutputs() {
+      document.getElementById('noteOutputBody').innerHTML = `<div class="text-slate-400 italic text-center py-20">Enter shorthand text on the left to begin.</div>`;
+      document.getElementById('topicTags').innerHTML = `<span class="text-xs text-slate-400 italic">No topics</span>`;
+      document.getElementById('detectedShorthandBadges').innerHTML = `<span class="text-xs text-slate-400 italic">No terms detected</span>`;
+      document.getElementById('actionMatrixBody').innerHTML = `<tr><td colspan="4" class="py-12 text-center text-slate-400 italic">No task items.</td></tr>`;
+      document.getElementById('svgMindmapContainer').innerHTML = `<span class="text-xs text-slate-500 italic">Mindmap inactive.</span>`;
+    }
+
+    // EXPORT FUNCTIONS
+    function exportNote(type) {
+      if (!lastProcessedData.expandedText) {
+        showToast('No note content to export');
+        return;
+      }
+
+      if (type === 'markdown') {
+        downloadFile(`${lastProcessedData.expandedText}`, 'Synthesized_Notes.md', 'text/markdown');
+      } else if (type === 'json') {
+        downloadFile(JSON.stringify(lastProcessedData, null, 2), 'Synthesized_Notes.json', 'application/json');
+      } else if (type === 'copy') {
+        copyTextToClipboard(lastProcessedData.expandedText);
+        showToast('Copied formatted notes to clipboard');
+      } else if (type === 'print') {
+        window.print();
+      }
+    }
+
+    function copyTextToClipboard(text) {
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      document.body.removeChild(temp);
+    }
+
+    function downloadFile(content, filename, contentType) {
+      const a = document.createElement('a');
+      const blob = new Blob([content], { type: contentType });
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast(`Downloaded ${filename}`);
+    }
+
+    // VOICE DICTATION
+    function setupDictationEngine() {
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+          }
+          const textarea = document.getElementById('rawInput');
+          textarea.value = transcript;
+          updateInputStats();
+        };
+
+        recognition.onerror = () => stopDictation();
+        recognition.onend = () => { if (isDictating) stopDictation(); };
+      } else {
+        document.getElementById('dictationBtn').style.display = 'none';
+      }
+    }
+
+    function toggleDictation() {
+      if (!recognition) return;
+      if (!isDictating) {
+        recognition.start();
+        isDictating = true;
+        document.getElementById('dictationBtn').classList.add('bg-rose-500', 'text-white');
+        document.getElementById('dictationLabel').innerText = 'Listening...';
+        showToast('Voice dictation started. Speak notes...');
+      } else {
+        stopDictation();
+      }
+    }
+
+    function stopDictation() {
+      if (recognition) recognition.stop();
+      isDictating = false;
+      document.getElementById('dictationBtn').classList.remove('bg-rose-500', 'text-white');
+      document.getElementById('dictationLabel').innerText = 'Dictate';
+      runSynthesizerPipeline();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      toast.classList.remove('opacity-0', '-translate-y-4', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-4', 'pointer-events-none');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>
